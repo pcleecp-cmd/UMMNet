@@ -13,7 +13,6 @@ This folder contains only the main experiment code:
 - Raw dataset images/masks are intentionally excluded.
 - Ablation/rebuttal control options are removed from `main.py`.
 - Training log output is simplified to one line per epoch.
-- `DW_ASPP` in decoder is replaced by `LRF_MSC`.
 
 ## Run
 
