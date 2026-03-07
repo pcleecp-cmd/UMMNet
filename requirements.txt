@@ -1,0 +1,20 @@
+# Core
+numpy==1.26.4
+pandas==2.2.3
+scipy==1.13.1
+tqdm==4.66.5
+Pillow==10.4.0
+
+# Deep Learning
+torch==2.4.1
+
+# Data / Augmentation
+opencv-python==4.10.0.84
+albumentations==1.4.24
+scikit-learn==1.5.2
+SimpleITK==2.4.0
+
+# Metrics / Logging
+medpy==0.5.2
+hausdorff==0.2.6
+tensorboardX==2.6.2.2
