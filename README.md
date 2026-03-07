@@ -1,4 +1,4 @@
-# UMMNet (Open-Source Clean Version)
+# UMMNet
 
 This folder contains only the main experiment code:
 
