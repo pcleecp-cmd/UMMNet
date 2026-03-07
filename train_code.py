@@ -181,7 +181,7 @@ class Trainer:
         """创建EMA模型，针对MRI数据集调整衰减率"""
         # 将衰减率从0.995降低到0.99，使模型更快适应最新参数
         # 对于MRI这种细节丰富的医学图像，模型需要更快适应最新学到的特征
-        self.ema_decay = 0.99  # 修改为0.99，适合医学图像数据集通常较小的情况
+        self.ema_decay = 0.99  
         
         ema = copy.deepcopy(model).eval().to(self.device)
         for p in ema.parameters():
@@ -1419,5 +1419,6 @@ class Trainer:
         except Exception as e:
             print(f"恢复检查点时出错: {e}")
             traceback.print_exc()
+
 
 
