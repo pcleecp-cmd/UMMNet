@@ -1,5 +1,5 @@
 ﻿# UMMNet-main/UMMNet/kits/saver.py
-# Modified to remove dependency on args.modalities
+
 
 import os
 import shutil
@@ -12,12 +12,9 @@ class Saver(object):
 
     def __init__(self, args):
         self.args = args
-        # --- MODIFIED Directory Path ---
-        # Original line used args.modalities:
-        # self.directory = os.path.join(args.save_dir, args.dataset, args.modalities + "_" + args.model)
-        # New line uses only dataset and model:
+
         self.directory = os.path.join(args.save_dir, args.dataset, args.model)
-        # --- End MODIFICATION ---
+
 
         self.runs = sorted(glob.glob(os.path.join(self.directory, 'experiment_*')))
         run_id = int(self.runs[-1].split('_')[-1]) + 1 if self.runs else 0
