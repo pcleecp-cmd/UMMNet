@@ -97,7 +97,7 @@ class UMMNet(nn.Module):
         self.down2_3 = Down(dims[2], dims[3])
         self.enc2_4 = Encoder(dims[3], blocks[3], drop_paths[3])
 
-        def build_fusion(channels: int) -> UMMF:
+        def build_ummf(channels: int) -> UMMF:
             return UMMF(
                 channels,
                 first=True,
@@ -110,7 +110,7 @@ class UMMNet(nn.Module):
                 mc_dropout_samples_eval=mc_dropout_samples_eval,
             )
 
-        self.bottleneck_fusion = build_fusion(dims[3])
+        self.bottleneck_ummf = build_ummf(dims[3])
 
         self.bottleneck_adjust_conv = nn.Sequential(
             nn.Conv2d(dims[3], dims[2], kernel_size=1, padding=0, bias=False),
@@ -118,13 +118,13 @@ class UMMNet(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.ug_fusion_skip1 = build_fusion(dims[0])
-        self.ug_fusion_skip2 = build_fusion(dims[1])
-        self.ug_fusion_skip3 = build_fusion(dims[2])
+        self.ummf_skip1 = build_ummf(dims[0])
+        self.ummf_skip2 = build_ummf(dims[1])
+        self.ummf_skip3 = build_ummf(dims[2])
 
-        self.sam1 = UDEC(dims[2], num_directions=udec_num_directions, delta=udec_delta)
-        self.sam2 = UDEC(dims[1], num_directions=udec_num_directions, delta=udec_delta)
-        self.sam3 = UDEC(dims[0], num_directions=udec_num_directions, delta=udec_delta)
+        self.udec_stage3 = UDEC(dims[2], num_directions=udec_num_directions, delta=udec_delta)
+        self.udec_stage2 = UDEC(dims[1], num_directions=udec_num_directions, delta=udec_delta)
+        self.udec_stage1 = UDEC(dims[0], num_directions=udec_num_directions, delta=udec_delta)
 
         self.dec3 = UBlock(
             dims[2] * 2,
@@ -147,12 +147,12 @@ class UMMNet(nn.Module):
 
         self.out_conv = conv1x1(dims[0], num_classes)
 
-    def _run_fusion(self, module, x0, m1, m2, save_analysis: bool):
+    def _run_ummf(self, module, x0, m1, m2, save_analysis: bool):
         if isinstance(module, UMMF):
             return module(x0, m1, m2, save_uncertainty=save_analysis)
         return module(x0, m1, m2)
 
-    def _run_sam(self, module, skip, dec, save_analysis: bool):
+    def _run_udec(self, module, skip, dec, save_analysis: bool):
         if isinstance(module, UDEC):
             return module(skip, dec, save_intermediate=save_analysis)
         return module(skip, dec)
@@ -161,30 +161,30 @@ class UMMNet(nn.Module):
         self.latest_analysis = {
             "ummf": {
                 "bottleneck": (
-                    self.bottleneck_fusion.get_visualizations()
-                    if isinstance(self.bottleneck_fusion, UMMF)
+                    self.bottleneck_ummf.get_visualizations()
+                    if isinstance(self.bottleneck_ummf, UMMF)
                     else None
                 ),
                 "skip3": (
-                    self.ug_fusion_skip3.get_visualizations()
-                    if isinstance(self.ug_fusion_skip3, UMMF)
+                    self.ummf_skip3.get_visualizations()
+                    if isinstance(self.ummf_skip3, UMMF)
                     else None
                 ),
                 "skip2": (
-                    self.ug_fusion_skip2.get_visualizations()
-                    if isinstance(self.ug_fusion_skip2, UMMF)
+                    self.ummf_skip2.get_visualizations()
+                    if isinstance(self.ummf_skip2, UMMF)
                     else None
                 ),
                 "skip1": (
-                    self.ug_fusion_skip1.get_visualizations()
-                    if isinstance(self.ug_fusion_skip1, UMMF)
+                    self.ummf_skip1.get_visualizations()
+                    if isinstance(self.ummf_skip1, UMMF)
                     else None
                 ),
             },
             "udec": {
-                "stage3": self.sam1.get_direction_analysis(),
-                "stage2": self.sam2.get_direction_analysis(),
-                "stage1": self.sam3.get_direction_analysis(),
+                "stage3": self.udec_stage3.get_direction_analysis(),
+                "stage2": self.udec_stage2.get_direction_analysis(),
+                "stage1": self.udec_stage1.get_direction_analysis(),
             },
         }
 
@@ -214,20 +214,20 @@ class UMMNet(nn.Module):
         d2_3 = self.down2_3(f2_3)
         f2_4 = self.enc2_4(d2_3)
 
-        bot_fused_ug = self._run_fusion(self.bottleneck_fusion, None, f1_4, f2_4, save_analysis)
-        bot_fused_final = self.bottleneck_adjust_conv(bot_fused_ug)
+        bot_fused_ummf = self._run_ummf(self.bottleneck_ummf, None, f1_4, f2_4, save_analysis)
+        bot_fused_final = self.bottleneck_adjust_conv(bot_fused_ummf)
 
-        skip3_fused = self._run_fusion(self.ug_fusion_skip3, None, f1_3, f2_3, save_analysis)
-        up3_sam_out = self._run_sam(self.sam1, skip3_fused, bot_fused_final, save_analysis)
-        dec_out3 = self.dec3(up3_sam_out)
+        skip3_ummf = self._run_ummf(self.ummf_skip3, None, f1_3, f2_3, save_analysis)
+        up3_udec_out = self._run_udec(self.udec_stage3, skip3_ummf, bot_fused_final, save_analysis)
+        dec_out3 = self.dec3(up3_udec_out)
 
-        skip2_fused = self._run_fusion(self.ug_fusion_skip2, None, f1_2, f2_2, save_analysis)
-        up2_sam_out = self._run_sam(self.sam2, skip2_fused, dec_out3, save_analysis)
-        dec_out2 = self.dec2(up2_sam_out)
+        skip2_ummf = self._run_ummf(self.ummf_skip2, None, f1_2, f2_2, save_analysis)
+        up2_udec_out = self._run_udec(self.udec_stage2, skip2_ummf, dec_out3, save_analysis)
+        dec_out2 = self.dec2(up2_udec_out)
 
-        skip1_fused = self._run_fusion(self.ug_fusion_skip1, None, f1_1, f2_1, save_analysis)
-        up1_sam_out = self._run_sam(self.sam3, skip1_fused, dec_out2, save_analysis)
-        dec_out1 = self.dec1(up1_sam_out)
+        skip1_ummf = self._run_ummf(self.ummf_skip1, None, f1_1, f2_1, save_analysis)
+        up1_udec_out = self._run_udec(self.udec_stage1, skip1_ummf, dec_out2, save_analysis)
+        dec_out1 = self.dec1(up1_udec_out)
         if save_analysis:
             self._cache_analysis()
 
